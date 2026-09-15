@@ -1,0 +1,466 @@
+{
+  "name": "checkpoint1_Ingrid_ledesma",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        96,
+        0
+      ],
+      "id": "acb20ca4-2a47-4eb3-9f5f-4448d135e51a",
+      "name": "When chat message received",
+      "webhookId": "21ee5961-373e-4a7c-bf37-dd6c73f27da8"
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "[ROL Y ÁMBITO]\nSos el Agente de Atención al Cliente de Renovadas, una tienda online de lentes Ray-Ban que opera bajo modalidad dropshipping. Tu ámbito es interactuar con clientes que consultan por stock, características y precio de los lentes, acompañarlos en la gestión inicial de su pedido, y enviarles el código de seguimiento de su envío cuando esté disponible.\n\nNO tenés autorización para: procesar pagos, confirmar una venta como cerrada, modificar precios o stock manualmente, prometer plazos de envío que no estén confirmados en la base de datos, ofrecer descuentos o promociones no autorizadas, inventar o estimar un código de seguimiento, ni comprometer condiciones comerciales que no estén reflejadas en Notion.\n\n[OBJETIVO OPERATIVO]\nResponder consultas de clientes sobre el catálogo (modelo, características, precio, disponibilidad) consultando siempre la base de productos actualizada, avanzar en la gestión del pedido hasta derivarlo a revisión humana para el cierre, y enviar por correo el código de seguimiento del envío cuando el cliente lo solicite y el dato exista en la base.\n\n[REGLAS DE USO DE HERRAMIENTAS]\n- Usá \"Consultar_Catalogo_Notion\" para verificar disponibilidad y precio actual de cualquier lente antes de responder al cliente. Nunca respondas con precios o stock de memoria.\n- Si el producto consultado no aparece en la base o figura como no disponible, informá esto al cliente sin inventar alternativas no confirmadas.\n- Para avanzar un pedido, reuní: nombre del cliente, contacto, modelo/color elegido y cantidad. Si falta un dato, pedilo con una única pregunta clara. Una vez completos, usá \"Crear_Pedido_Notion\" para registrarlo.\n- Cuando el cliente pida el estado de su envío o su código de seguimiento, usá \"Consultar_Pedido_Notion\" para buscarlo.\n- Usá \"Enviar_Codigo_Seguimiento_Gmail\" SOLO cuando el código exista (verificado con Consultar_Pedido_Notion) y tengas confirmado el mail del cliente. Nunca envíes un mail con un código vacío o inventado.\n- Si el código de seguimiento todavía no fue cargado por el proveedor, informá al cliente que aún no está disponible. No prometas una fecha exacta.\n- No inventes características técnicas de un lente que no estén en la base de Notion.\n\n[PROTOCOLO DE ESCALAMIENTO / GUARDRAILS]\n- Antes de escalar cualquier caso sensible (cancelación, cambio, reclamo), reuní primero los datos del pedido en cuestión: nombre del cliente, contacto, y el modelo/número de pedido si lo tiene. Usá \"Consultar_Pedido_Notion\" para verificar que el pedido exista. Si falta algún dato clave, pedilo con una única pregunta clara antes de continuar.\n- Recién cuando tengas los datos mínimos del pedido (o el cliente confirme que no los tiene), derivá a revisión humana si: el cliente reclama por un pedido ya realizado, pide algo fuera de catálogo, cuestiona un precio que cambió recientemente, quiere coordinar el pago/cierre de la compra, reporta que el código de seguimiento no funciona / el envío no llegó, o pide cancelar/cambiar un pedido.\n- Si detectás una inconsistencia entre lo que el cliente dice y lo que figura en Notion (precio desactualizado, producto discontinuado, pedido sin registro), marcá el caso para revisión humana en lugar de resolverlo vos.\n- Una vez reunidos los datos necesarios, respondé exactamente: \"Tu consulta requiere revisión de nuestro equipo, en breve te contactamos.\" — esta frase es la señal que activa la derivación, así que usala solo cuando ya tengas la info del pedido lista para pasarle al equipo.\n\n[ESTILO]\n- Escribí en español rioplatense, cercano pero profesional.\n- No uses lenguaje inclusivo con terminaciones en -e, -x o @.\n- Sé claro y breve, evitá tecnicismos innecesarios con el cliente.",
+          "maxIterations": 6
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        320,
+        0
+      ],
+      "id": "ae8da547-2620-48df-8a6b-74a974420878",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-120b",
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        240,
+        272
+      ],
+      "id": "599be1f0-91df-470b-b11c-ba784e2e16b8",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "2Oz6RkJdflVpD3QN",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Usá esta herramienta cada vez que el cliente pregunte por disponibilidad, precio, características o color de un modelo de lentes Ray-Ban, o cuando necesites verificar el estado de un pedido ya realizado (incluyendo si tiene código de seguimiento cargado). Esta tabla de Notion es la única fuente de verdad de productos y pedidos de la tienda: contiene modelo, color, precio actual, stock disponible y, cuando corresponde, el código de seguimiento del envío. Consultala SIEMPRE antes de responder cualquier dato de precio, stock o tracking al cliente — nunca respondas estos datos de memoria ni los inventes, ya que cambian frecuentemente por depender de proveedores externos. Si el producto o pedido buscado no aparece en la tabla, informalo como no disponible o no encontrado, sin asumir ni completar el dato.",
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "3b1f331b-7ba5-8079-89a0-e952ec60ebb7",
+          "mode": "list",
+          "cachedResultName": "Productos",
+          "cachedResultUrl": "https://app.notion.com/p/3b1f331b7ba5807989a0e952ec60ebb7"
+        },
+        "limit": 5,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notionTool",
+      "typeVersion": 2.2,
+      "position": [
+        432,
+        272
+      ],
+      "id": "d964be01-743f-414f-8c54-78bf21bf4b01",
+      "name": "Consultar_Catalogo_Notion",
+      "credentials": {
+        "notionApi": {
+          "id": "bAZeCAsqMZIceGQj",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "{{ $fromAI('email_cliente', 'mail del cliente') }",
+        "subject": "{{ $fromAI('subject', 'asunto del email') }",
+        "message": "=",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1232,
+        -304
+      ],
+      "id": "11de068e-8137-4ee9-b932-0222b416f2ff",
+      "name": "Enviar_Codigo_Seguimiento_Gmail",
+      "webhookId": "c3fb1ade-47a7-4a34-bada-70ffbbe38da2",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "6bPuDsY9WfZXSUBF",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0C23AWAU8Y",
+          "mode": "id"
+        },
+        "text": "=",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        912,
+        112
+      ],
+      "id": "7405c429-1c9a-4618-9148-51007a65983c",
+      "name": "Send a message",
+      "webhookId": "bb23684f-791d-4c53-8565-d6f676172094",
+      "credentials": {
+        "slackApi": {
+          "id": "asQAStPtkB3at2kK",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Usá esta herramienta cuando el cliente pregunte por el estado de un pedido ya realizado o pida su código de seguimiento. Buscá el registro por nombre o contacto del cliente en la tabla de Pedidos. Si el campo de código de seguimiento está vacío, informá que aún no fue cargado por el proveedor — no lo inventes ni lo estimes.",
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "f51179b2-a7c7-4496-a931-64c8d6a95f8d",
+          "mode": "list",
+          "cachedResultName": "Pedidos",
+          "cachedResultUrl": "https://app.notion.com/p/f51179b2a7c74496a93164c8d6a95f8d"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notionTool",
+      "typeVersion": 2.2,
+      "position": [
+        592,
+        272
+      ],
+      "id": "3f5603a8-a4c4-43fd-8671-5b3d855d0a80",
+      "name": "Crear Pedidos Notion",
+      "credentials": {
+        "notionApi": {
+          "id": "bAZeCAsqMZIceGQj",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Usá esta herramienta cuando el cliente pregunte por el estado de un pedido ya realizado o p Buscá el registro por nombre o contacto del cliente en la tabla de Pedidos. Si el campo de código de seguimiento está vacío, informá que aún no fue cargado por el proveedor — no lo inventes ni lo estimes.",
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "f51179b2-a7c7-4496-a931-64c8d6a95f8d",
+          "mode": "list",
+          "cachedResultName": "Pedidos",
+          "cachedResultUrl": "https://app.notion.com/p/f51179b2a7c74496a93164c8d6a95f8d"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notionTool",
+      "typeVersion": 2.2,
+      "position": [
+        752,
+        272
+      ],
+      "id": "9fb6eed5-06c1-4ad9-ac30-8d0a9195ca9f",
+      "name": "Consultar pedidos notion",
+      "credentials": {
+        "notionApi": {
+          "id": "bAZeCAsqMZIceGQj",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0C23A3UKU0",
+          "mode": "id"
+        },
+        "message": "=El agente de atención al cliente necesita aprobación humana antes de continuar. Motivo: {{ $json.output }}",
+        "approvalOptions": {
+          "values": {}
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        912,
+        -496
+      ],
+      "id": "7486375f-524a-49f1-8b93-4da63c31d81c",
+      "name": "Human in the loop",
+      "webhookId": "a02c046d-296d-46f6-821c-e4ae5da3bdcb",
+      "credentials": {
+        "slackApi": {
+          "id": "asQAStPtkB3at2kK",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "7830dcd2-80b3-4188-bb80-588e2a117404",
+              "leftValue": "={{ $json.output.toLowerCase().includes(\"código de seguimiento\") || $json.output.toLowerCase().includes(\"envío\") }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        912,
+        -144
+      ],
+      "id": "7a7a602c-2e2f-4d8d-acfe-d6d35fbed5ac",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "content": "log de observabilidad",
+        "height": 80,
+        "width": 150
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        896,
+        272
+      ],
+      "id": "53c18ca5-8f34-491e-b24c-eec83add830c",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1232,
+        -48
+      ],
+      "id": "be534bc5-c9cf-4861-8168-60d0c90c6bbf",
+      "name": "No Operation, do nothing"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "26839c13-3838-4c71-b0bd-559bfb70ad48",
+              "leftValue": "={{ $json.output.toLowerCase().includes(\"revisión de nuestro equipo\") }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        640,
+        -416
+      ],
+      "id": "46f07fe2-6a0b-4dca-98e0-bae186f65aac",
+      "name": "If"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        912,
+        -320
+      ],
+      "id": "1455adea-1a4b-4915-bf31-c32f1d613ade",
+      "name": "No Operation, do nothing1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar_Catalogo_Notion": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crear Pedidos Notion": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar pedidos notion": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        []
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Enviar_Codigo_Seguimiento_Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Human in the loop",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "153f994b-ecf3-4c69-b517-d53c8422a0b9",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9c790cd9fccd0f2c7611f2994047b3442fc6f6ed9491def016ffce65acb22608"
+  },
+  "id": "c52NH5xa0IN7SyGQ",
+  "tags": []
+}
