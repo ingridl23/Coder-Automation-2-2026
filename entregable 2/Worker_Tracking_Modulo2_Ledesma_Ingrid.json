@@ -1,0 +1,226 @@
+{
+  "name": "Worker_Tracking_Renovadas",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "reutiliza tal cual la tool Consultar_pedidos_Notionde M1",
+        "height": 80
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        192
+      ],
+      "id": "75b104a7-9124-4dc6-a91d-79863cd6d32d",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.original_input }}",
+        "options": {
+          "systemMessage": "=Sos el especialista en Seguimientos de envios en Renovadas, tienda online de lentes Ray-Ban, parte de Rena, el asistente virtual de la tienda. Si el cliente pregunta tu nombre o quién sos, respondé que sos Rena, el asistente de Renovadas.\n\nSolicitud original:\n{{ $json.original_input }}\n\nIntención detectada: {{ $json.intent }}\nConfianza: {{ $json.confidence }}\nRiesgo: {{ $json.risk }}\n\nAtendé únicamente consultas sobre el estado de un pedido ya realizado y su código de seguimiento. Usá \"Consultar_Pedido_Notion\" para buscar el pedido por nombre o contacto del cliente.\n\nUsá \"Enviar_Codigo_Seguimiento_Gmail\" SOLO cuando el código de seguimiento exista en el registro y tengas el mail del cliente confirmado. Nunca envíes un mail con un código vacío o inventado.\n\nSi el código todavía no fue cargado por el proveedor, informá al cliente que aún no está disponible. No prometas una fecha exacta.\n\nNo inventes datos. Si la solicitud requiere gestionar un pedido nuevo, una consulta de catálogo, o no tenés información suficiente, indicá que requiere derivación a otro especialista.\n\nRespondé SOLO como JSON válido, sin markdown:\n{\n  \"status\": \"success\",\n  \"worker\": \"TRACKING\",\n  \"respuesta\": \"respuesta breve y clara para el usuario\",\n  \"requires_human\": false\n}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -48,
+        288
+      ],
+      "id": "91a76e89-b9ad-4bee-aac3-b7f381e6e3c3",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "qwen/qwen3.8-27b",
+        "options": {
+          "maxTokensToSample": 500
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -48,
+        512
+      ],
+      "id": "600c0d0b-a392-40c9-aeff-1a80acbc2a30",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "2Oz6RkJdflVpD3QN",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "original_input"
+            },
+            {
+              "name": "intent"
+            },
+            {
+              "name": "confidence",
+              "type": "number"
+            },
+            {
+              "name": "risk"
+            }
+          ]
+        }
+      },
+      "id": "9db5d49f-4bf5-4e63-b03b-36f9e00980e2",
+      "name": "Entrada desde Manager",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -272,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.text ?? $json.output ?? $json.response ?? '';\nlet d;\ntry {\n  const clean = String(raw).replace(/^```json\\s*/i, '').replace(/```$/,'').trim();\n  d = JSON.parse(clean);\n} catch (e) {\n  d = {\n    status: 'error',\n    worker: 'TRACKING',\n    respuesta: String(raw || 'No se pudo interpretar la respuesta del especialista.'),\n    requires_human: true\n  };\n}\nreturn [{ json: {\n  status: d.status ?? 'success',\n  worker: d.worker ?? 'TRACKING',\n  respuesta: d.respuesta ?? '',\n  requires_human: Boolean(d.requires_human)\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        288
+      ],
+      "id": "eb47ca18-0a9c-4bf2-bf40-d2ce6e047634",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Usá esta herramienta cuando el cliente pregunte por el estado de un pedido ya realizado o p Buscá el registro por nombre o contacto del cliente en la tabla de Pedidos. Si el campo de código de seguimiento está vacío, informá que aún no fue cargado por el proveedor — no lo inventes ni lo estimes.",
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "f51179b2-a7c7-4496-a931-64c8d6a95f8d",
+          "mode": "list",
+          "cachedResultName": "Pedidos",
+          "cachedResultUrl": "https://app.notion.com/p/f51179b2a7c74496a93164c8d6a95f8d"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notionTool",
+      "typeVersion": 2.2,
+      "position": [
+        96,
+        512
+      ],
+      "id": "52965752-8ff3-4109-beee-6a3f5c397af7",
+      "name": "Consultar pedidos notion",
+      "credentials": {
+        "notionApi": {
+          "id": "bAZeCAsqMZIceGQj",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $fromAI('email_cliente', 'mail de contacto del cliente', 'string') }}",
+        "subject": "={{ $fromAI('subject', 'asunto del email') }}",
+        "message": "={{ $fromAI('mensaje', 'cuerpo del correo con el código de seguimiento del pedido', 'string') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.2,
+      "position": [
+        272,
+        512
+      ],
+      "id": "312dc6fe-7a59-4c91-a011-19de534b2c50",
+      "name": "Send a message in Gmail",
+      "webhookId": "b1810eef-a80d-4a25-b972-83cfdd254499",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "6bPuDsY9WfZXSUBF",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Entrada desde Manager": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar pedidos notion": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message in Gmail": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "cb17bd0e-3c2c-4333-80e8-07647815a380",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9c790cd9fccd0f2c7611f2994047b3442fc6f6ed9491def016ffce65acb22608"
+  },
+  "id": "AnzAFJ3DiEY7MO5B",
+  "tags": []
+}

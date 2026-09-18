@@ -1,0 +1,193 @@
+{
+  "name": "Worker_Catalogo_Renovadas",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "reutiliza tal cual la tool Consultar_Catalogo_Notion de M1",
+        "height": 80
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -784,
+        -496
+      ],
+      "id": "ce007e34-7e09-4ce4-a9e0-a5d98d9dc821",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.original_input }}",
+        "options": {
+          "systemMessage": "Sos el especialista en Catálogo de Renovadas, tienda online de lentes Ray-Ban, parte de Rena, el asistente virtual de la tienda. Si el cliente pregunta tu nombre o quién sos, respondé que sos Rena, el asistente de Renovadas.\n\nSolicitud original:\n{{ $json.original_input }}\n\nIntención detectada: {{ $json.intent }}\nConfianza: {{ $json.confidence }}\nRiesgo: {{ $json.risk }}\n\nAtendé únicamente consultas sobre disponibilidad, precio, características y color de los lentes. Usá SIEMPRE la herramienta \"Consultar_Catalogo_Notion\" antes de responder — nunca inventes stock ni precios de memoria.\n\nSi el producto consultado no aparece en la base o figura como no disponible, informalo sin inventar alternativas no confirmadas.\n\nNo inventes datos. Si la solicitud requiere una acción sensible, gestión de pedido, pago o no tenés información suficiente en el catálogo, indicá que requiere derivación a otro especialista.\n\nRespondé SOLO como JSON válido, sin markdown:\n{\n  \"status\": \"success\",\n  \"worker\": \"CATALOGO\",\n  \"respuesta\": \"respuesta breve y clara para el usuario\",\n  \"requires_human\": false\n}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -560,
+        -368
+      ],
+      "id": "91b962cb-9297-4bcf-a61f-02f0f2245276",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Usá esta herramienta cada vez que el cliente pregunte por disponibilidad, precio, características o color de un modelo de lentes Ray-Ban, o cuando necesites verificar el estado de un pedido ya realizado (incluyendo si tiene código de seguimiento cargado). Esta tabla de Notion es la única fuente de verdad de productos y pedidos de la tienda: contiene modelo, color, precio actual, stock disponible y, cuando corresponde, el código de seguimiento del envío. Consultala SIEMPRE antes de responder cualquier dato de precio, stock o tracking al cliente — nunca respondas estos datos de memoria ni los inventes, ya que cambian frecuentemente por depender de proveedores externos. Si el producto o pedido buscado no aparece en la tabla, informalo como no disponible o no encontrado, sin asumir ni completar el dato.",
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "3b1f331b-7ba5-8079-89a0-e952ec60ebb7",
+          "mode": "list",
+          "cachedResultName": "Productos",
+          "cachedResultUrl": "https://app.notion.com/p/3b1f331b7ba5807989a0e952ec60ebb7"
+        },
+        "limit": 5,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notionTool",
+      "typeVersion": 2.2,
+      "position": [
+        -400,
+        -144
+      ],
+      "id": "3290b9b4-c90b-4e68-81ff-8b15b80c6c4b",
+      "name": "Consultar_Catalogo_Notion",
+      "credentials": {
+        "notionApi": {
+          "id": "bAZeCAsqMZIceGQj",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "qwen/qwen3.8-27b",
+        "options": {
+          "maxTokensToSample": 500
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        -144
+      ],
+      "id": "051a3176-dcfc-48cf-b79c-2e18f0e590b3",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "2Oz6RkJdflVpD3QN",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "original_input"
+            },
+            {
+              "name": "intent"
+            },
+            {
+              "name": "confidence",
+              "type": "number"
+            },
+            {
+              "name": "risk"
+            }
+          ]
+        }
+      },
+      "id": "643489e5-5af6-4494-8f0c-ecaac9f9a0fd",
+      "name": "Entrada desde Manager",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -784,
+        -368
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.text ?? $json.output ?? $json.response ?? '';\nlet d;\ntry {\n  const clean = String(raw).replace(/^```json\\s*/i, '').replace(/```$/,'').trim();\n  d = JSON.parse(clean);\n} catch (e) {\n  d = {\n    status: 'error',\n    worker: 'CATALOGO',\n    respuesta: String(raw || 'No se pudo interpretar la respuesta del especialista.'),\n    requires_human: true\n  };\n}\nreturn [{ json: {\n  status: d.status ?? 'success',\n  worker: d.worker ?? 'CATALOGO',\n  respuesta: d.respuesta ?? '',\n  requires_human: Boolean(d.requires_human)\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -208,
+        -368
+      ],
+      "id": "eb24f0fa-02a8-4b86-b72d-627ad8e823f9",
+      "name": "Code in JavaScript"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Consultar_Catalogo_Notion": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Entrada desde Manager": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "e0178fc8-a74e-4eea-ae5a-3944cf8c4c16",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9c790cd9fccd0f2c7611f2994047b3442fc6f6ed9491def016ffce65acb22608"
+  },
+  "id": "A45n6rrjGtkUXbvK",
+  "tags": []
+}

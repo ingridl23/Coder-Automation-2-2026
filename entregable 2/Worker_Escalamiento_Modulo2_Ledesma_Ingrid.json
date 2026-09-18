@@ -1,0 +1,160 @@
+{
+  "name": "Worker_Escalamiento_Renovadas",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "original_input"
+            },
+            {
+              "name": "intent"
+            },
+            {
+              "name": "confidence",
+              "type": "number"
+            },
+            {
+              "name": "risk"
+            }
+          ]
+        }
+      },
+      "id": "fe51c8a3-a718-4831-a197-9975fc2d4841",
+      "name": "Entrada desde Manager",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        464,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const approved = $json.data?.approved ?? false;\n\nreturn [{ json: {\n  status: 'success',\n  worker: 'ESCALAMIENTO',\n  respuesta: approved\n    ? 'Tu consulta fue revisada y aprobada por nuestro equipo. En breve nos contactamos para continuar.'\n    : 'Tu consulta requiere una revisión adicional de nuestro equipo antes de continuar.',\n  requires_human: true\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1152,
+        112
+      ],
+      "id": "1f9b2dc1-d31f-4f6d-abf8-45d488e57424",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cda91731-92b9-4de5-a7c3-b77c2005f933",
+              "name": "mensaje",
+              "value": "=Caso derivado a revisión humana.\nConsulta original: {{ $json.original_input }}\nIntención: {{ $json.intent }}\nConfianza: {{ $json.confidence }}\nRiesgo: {{ $json.risk }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        112
+      ],
+      "id": "bf6b28f5-7371-4ce5-aa76-972bf14a219c",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0C23A3UKU0",
+          "mode": "id"
+        },
+        "message": "=El agente de atención al cliente necesita aprobación humana antes de continuar. Motivo: {{ $json.mensaje }}",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        912,
+        112
+      ],
+      "id": "f584b540-0602-46b6-a01d-55f5ded1d89e",
+      "name": "Human in the loop",
+      "webhookId": "a02c046d-296d-46f6-821c-e4ae5da3bdcb",
+      "credentials": {
+        "slackApi": {
+          "id": "asQAStPtkB3at2kK",
+          "name": "Slack account"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Entrada desde Manager": [
+      {
+        "json": {}
+      }
+    ]
+  },
+  "connections": {
+    "Entrada desde Manager": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Human in the loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Human in the loop": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "053c8478-4172-439b-a4b4-eaf5349ee8ba",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9c790cd9fccd0f2c7611f2994047b3442fc6f6ed9491def016ffce65acb22608"
+  },
+  "id": "fdudQNRHl3TgfETG",
+  "tags": []
+}

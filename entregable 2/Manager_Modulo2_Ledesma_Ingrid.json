@@ -1,0 +1,741 @@
+{
+  "name": "Manager_Renovadas",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        -416
+      ],
+      "id": "afa434b9-32f5-4989-8ddd-fce65b7be2fa",
+      "name": "When chat message received",
+      "webhookId": "66e38a84-0a7e-43e8-b3e7-43d411ed03f4"
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "=Sos parte de Rena, el asistente virtual de Renovadas, tienda online de lentes Ray-Ban, y funcionás como el Router de su sistema multiagente.\n\nTu única función es clasificar el mensaje del cliente en un JSON estructurado. No respondas la consulta, no converses con el cliente, no expliques nada — solo clasificá\n\nMensaje del cliente:\n{{ $json.chatInput }}\n\nClasificá:\n- intent: uno de estos valores exactos: \"catalogo\" (consultas de disponibilidad, precio, características de lentes), \"tracking\" (código de seguimiento, estado de envío de un pedido ya hecho), \"pedidos\" (armar o confirmar un pedido nuevo), \"escalamiento\" (reclamos, cancelaciones, cambios, pagos, o cualquier caso sensible), \"saludo\" (cuando el mensaje es solo un saludo o apertura de conversación, sin una consulta específica todavía).\n\n- confidence: número entre 0 y 1 según qué tan clara está la intención\n\n- risk: \"HIGH\" si el mensaje es un reclamo, cancelación, pedido de reembolso, o cualquier situación sensible/urgente; \"LOW\" en cualquier otro caso\n\nRespondé SOLO como JSON válido, sin markdown:\n{\n  \"intent\": \"catalogo\",\n  \"confidence\": 0.9,\n  \"risk\": \"LOW\"\n}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        224,
+        -416
+      ],
+      "id": "deeb49f6-d084-40ee-841b-c9b6272a4a85",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "qwen/qwen3.8-27b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        304,
+        -192
+      ],
+      "id": "d8906536-97bf-44e4-a8f1-3a244c419365",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "2Oz6RkJdflVpD3QN",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f8049864-a911-48cd-a7a9-8d66db57f020",
+              "leftValue": "={{ $json.risk.trim().toUpperCase() }}",
+              "rightValue": "HIGH",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        800,
+        -416
+      ],
+      "id": "516eb11c-f15a-4298-bd53-a2de50ea91bd",
+      "name": "¿Es riesgo alto ?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.text ?? $json.output ?? $json.response ?? '';\nlet d;\ntry {\n  const clean = String(raw).replace(/^```json\\s*/i, '').replace(/```$/, '').trim();\n  d = JSON.parse(clean);\n} catch (e) {\n  d = {\n    intent: 'error_clasificacion',\n    confidence: 0,\n    risk: 'HIGH'\n  };\n}\nreturn [{ json: {\n  original_input: $('When chat message received').first().json.chatInput,\n  intent: d.intent ?? 'error_clasificacion',\n  confidence: d.confidence ?? 0,\n  risk: d.risk ?? 'HIGH'\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        576,
+        -416
+      ],
+      "id": "9125abfd-5bd7-4c0c-b272-550d77c164dd",
+      "name": "Parsear respuesta y  asignar risk"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "fdudQNRHl3TgfETG",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/fdudQNRHl3TgfETG",
+          "cachedResultName": "Worker_Escalamiento_Renovadas"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "confidence": 0
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "original_input",
+              "displayName": "original_input",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "intent",
+              "displayName": "intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "confidence",
+              "displayName": "confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            },
+            {
+              "id": "risk",
+              "displayName": "risk",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1248,
+        -688
+      ],
+      "id": "90225c8d-8556-44e3-b8d0-ef0158d2b7fa",
+      "name": "Call 'Worker_Escalamiento_Renovadas'"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "catalogo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "d68ef2c8-bd0c-429a-a156-61fa4d2da53e"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "="
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "e49fc0ed-417c-48ec-9a7a-bd37f7ae141a",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "tracking",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c2da04fa-c327-417f-9261-edcd99aac3f6",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "pedidos",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "1d18441f-bfb4-4b1c-8ed8-87900bce392a",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "saludo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1024,
+        -320
+      ],
+      "id": "636b4ffc-fd98-43e0-be17-5c6a81458aa6",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "A45n6rrjGtkUXbvK",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/A45n6rrjGtkUXbvK",
+          "cachedResultName": "Worker_Catalogo_Renovadas"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "confidence": 0
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "original_input",
+              "displayName": "original_input",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "intent",
+              "displayName": "intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "confidence",
+              "displayName": "confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            },
+            {
+              "id": "risk",
+              "displayName": "risk",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1248,
+        -496
+      ],
+      "id": "a99737fa-51bd-455c-9b6b-5e3439bf2aca",
+      "name": "Call 'Worker_Catalogo_Renovadas'"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "AnzAFJ3DiEY7MO5B",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/AnzAFJ3DiEY7MO5B",
+          "cachedResultName": "Worker_Tracking_Renovadas"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "confidence": 0
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "original_input",
+              "displayName": "original_input",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "intent",
+              "displayName": "intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "confidence",
+              "displayName": "confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            },
+            {
+              "id": "risk",
+              "displayName": "risk",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1248,
+        -304
+      ],
+      "id": "79374293-22db-41d7-b674-33ca3b0345eb",
+      "name": "Call 'Worker_Tracking_Renovadas'"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "u8wdBa4t9yrgZbvx",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/u8wdBa4t9yrgZbvx",
+          "cachedResultName": "Worker_Pedidos_Renovadas"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "confidence": 0
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "original_input",
+              "displayName": "original_input",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "intent",
+              "displayName": "intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "confidence",
+              "displayName": "confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            },
+            {
+              "id": "risk",
+              "displayName": "risk",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1248,
+        -112
+      ],
+      "id": "73394647-e4f3-4a70-9536-4ef02131bc1b",
+      "name": "Call 'Worker_Pedidos_Renovadas'"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7c7bee13-ffd4-4a85-854c-e3ae8783dd6d",
+              "name": "output",
+              "value": "={{ $json.respuesta }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1680,
+        -464
+      ],
+      "id": "c68bf222-d2bb-47f5-a193-bf272c4547a9",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "content": "Sin importar cuál de los 4 Workers haya respondido, todos devuelven la misma forma {status, worker, respuesta, requires_human} — así que este nodo único puede extraer respuesta de cualquiera de ellos de forma genérica, sin necesitar 4 nodos Edit Fields distintos.",
+        "height": 240,
+        "width": 288
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1888,
+        -496
+      ],
+      "id": "6b6824a1-d8fb-4367-8e0f-3d08ad6a44b3",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0b254ac5-4cf8-4d05-89c7-126a7f978975",
+              "name": "status",
+              "value": "sucess",
+              "type": "string"
+            },
+            {
+              "id": "97635c8c-6984-4a69-ace4-bc8bb45c5a6a",
+              "name": "worker",
+              "value": "saludo",
+              "type": "string"
+            },
+            {
+              "id": "031ff4d8-e587-4028-8431-92f745265da8",
+              "name": "respuesta",
+              "value": "¡Hola! 👋 Soy Rena, el asistente virtual de Renovadas. Puedo ayudarte a consultar el catálogo, hacer un pedido, saber el estado de tu envío, o derivarte con nuestro equipo si lo necesitás. ¿En qué te puedo ayudar hoy?",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1248,
+        160
+      ],
+      "id": "e33006cd-44b8-4f1c-9d77-a4eb7cbbe4ea",
+      "name": "Edit Fields1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Parsear respuesta y  asignar risk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear respuesta y  asignar risk": {
+      "main": [
+        [
+          {
+            "node": "¿Es riesgo alto ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Es riesgo alto ?": {
+      "main": [
+        [
+          {
+            "node": "Call 'Worker_Escalamiento_Renovadas'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Call 'Worker_Catalogo_Renovadas'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call 'Worker_Tracking_Renovadas'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call 'Worker_Pedidos_Renovadas'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'Worker_Escalamiento_Renovadas'": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'Worker_Catalogo_Renovadas'": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'Worker_Tracking_Renovadas'": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'Worker_Pedidos_Renovadas'": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "09317b1f-12fe-4d8a-b5e3-92c4741650ff",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9c790cd9fccd0f2c7611f2994047b3442fc6f6ed9491def016ffce65acb22608"
+  },
+  "id": "MHfhM4hy9UwTGtEx",
+  "tags": []
+}

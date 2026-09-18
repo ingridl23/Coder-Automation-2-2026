@@ -1,0 +1,242 @@
+{
+  "name": "Worker_Pedidos_Renovadas",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "original_input"
+            },
+            {
+              "name": "intent"
+            },
+            {
+              "name": "confidence",
+              "type": "number"
+            },
+            {
+              "name": "risk"
+            }
+          ]
+        }
+      },
+      "id": "e9015ce2-f9ab-4db0-9046-9a2932f31ff4",
+      "name": "Entrada desde Manager",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -112,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.original_input }}",
+        "options": {
+          "systemMessage": "=Sos el especialista de Pedidos de Renovadas, tienda online de lentes Ray-Ban, parte de Rena, el asistente virtual de la tienda. Si el cliente pregunta tu nombre o quién sos, respondé que sos Rena, el asistente de Renovadas.\n\nSolicitud original:\n{{ $json.original_input }}\n\nIntención detectada: {{ $json.intent }}\nConfianza: {{ $json.confidence }}\nRiesgo: {{ $json.risk }}\n\nAtendé únicamente la gestión inicial de pedidos: reunir los datos del cliente y registrar el pedido. Para avanzar, reuní: nombre del cliente, contacto, modelo/color elegido y cantidad. Si falta un dato, pedilo con una única pregunta clara.\n\nUna vez completos los datos, usá \"Crear_Pedido_Notion\" para registrarlo con estado \"Pendiente\". Antes de crear, si tenés dudas de que el pedido ya exista, podés usar \"Consultar_Pedido_Notion\" para verificar.\n\nAl registrar el pedido en \"Crear_Pedido_Notion\", completá el campo resumen con el formato: \"Cliente: [nombre] | Contacto: [mail] | Modelo: [modelo/color]\"\n\nNo confirmes al cliente que el pedido está cerrado, solo que fue registrado y será revisado.\n\nNo inventes datos. Si la solicitud es sobre catálogo, seguimiento de un pedido ya enviado, o requiere una acción sensible (cancelación, cambio, pago), indicá que requiere derivación a otro especialista.\n\nRespondé SOLO como JSON válido, sin markdown:\n{\n  \"status\": \"success\",\n  \"worker\": \"PEDIDOS\",\n  \"respuesta\": \"respuesta breve y clara para el usuario\",\n  \"requires_human\": false\n}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        176,
+        0
+      ],
+      "id": "94f4e90d-26de-4b7a-a081-d5512ae6f82b",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.text ?? $json.output ?? $json.response ?? '';\nlet d;\ntry {\n  const clean = String(raw).replace(/^```json\\s*/i, '').replace(/```$/,'').trim();\n  d = JSON.parse(clean);\n} catch (e) {\n  d = {\n    status: 'error',\n    worker: 'PEDIDOS',\n    respuesta: String(raw || 'No se pudo interpretar la respuesta del especialista.'),\n    requires_human: true\n  };\n}\nreturn [{ json: {\n  status: d.status ?? 'success',\n  worker: d.worker ?? 'PEDIDOS',\n  respuesta: d.respuesta ?? '',\n  requires_human: Boolean(d.requires_human)\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        576,
+        0
+      ],
+      "id": "eb9c2617-31a8-4f0f-bdf8-d95acc4567a5",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "model": "qwen/qwen3.8-27b",
+        "options": {
+          "maxTokensToSample": 500
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        112,
+        224
+      ],
+      "id": "12d0c7fc-e7b9-4541-b1e6-8335e9207216",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "2Oz6RkJdflVpD3QN",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Usá esta herramienta cuando el cliente pregunte por el estado de un pedido ya realizado o pida su código de seguimiento. Buscá el registro por nombre o contacto del cliente en la tabla de Pedidos. Si el campo de código de seguimiento está vacío, informá que aún no fue cargado por el proveedor — no lo inventes ni lo estimes.",
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "f51179b2-a7c7-4496-a931-64c8d6a95f8d",
+          "mode": "list",
+          "cachedResultName": "Pedidos",
+          "cachedResultUrl": "https://app.notion.com/p/f51179b2a7c74496a93164c8d6a95f8d"
+        },
+        "title": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Title', ``, 'string') }}",
+        "simple": false,
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Cantidad|number"
+            },
+            {
+              "key": "Estado del pedido|select",
+              "selectValue": "Pendiente"
+            },
+            {
+              "key": "Resumen del pedido|rich_text",
+              "richText": true,
+              "text": {
+                "text": [
+                  {
+                    "text": "={{ $fromAI('resumen', ``, 'string') }}",
+                    "annotationUi": {}
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notionTool",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        224
+      ],
+      "id": "84faa656-bff2-48de-9404-c43880dc7dc9",
+      "name": "Crear Pedidos Notion",
+      "credentials": {
+        "notionApi": {
+          "id": "bAZeCAsqMZIceGQj",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Usá esta herramienta cuando el cliente pregunte por el estado de un pedido ya realizado o p Buscá el registro por nombre o contacto del cliente en la tabla de Pedidos. Si el campo de código de seguimiento está vacío, informá que aún no fue cargado por el proveedor — no lo inventes ni lo estimes.",
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "f51179b2-a7c7-4496-a931-64c8d6a95f8d",
+          "mode": "list",
+          "cachedResultName": "Pedidos",
+          "cachedResultUrl": "https://app.notion.com/p/f51179b2a7c74496a93164c8d6a95f8d"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notionTool",
+      "typeVersion": 2.2,
+      "position": [
+        368,
+        224
+      ],
+      "id": "9ae35eba-eb2d-42cf-afec-b6221337a8a8",
+      "name": "Consultar pedidos notion",
+      "credentials": {
+        "notionApi": {
+          "id": "bAZeCAsqMZIceGQj",
+          "name": "Notion account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Entrada desde Manager": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crear Pedidos Notion": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar pedidos notion": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "85b554ba-4c60-4253-8751-00092caa1c5d",
+  "meta": {
+    "instanceId": "9c790cd9fccd0f2c7611f2994047b3442fc6f6ed9491def016ffce65acb22608"
+  },
+  "id": "u8wdBa4t9yrgZbvx",
+  "tags": []
+}
