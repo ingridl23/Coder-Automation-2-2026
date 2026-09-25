@@ -17,8 +17,8 @@ Desde M2, el agente tiene nombre y personalidad propia: **Rena**, la asistente v
 |---|---|---|
 | M1 | Agente base: Trigger + AI Agent + System Prompt + Tools + Log de observabilidad | ✅ |
 | M2 | Multi-agente: Manager + Workers como sub-workflows | ✅ |
-| M3 | Memoria: contexto de conversación por Session_ID | ⏳ |
-| M4 | Integraciones reales: CRM / Calendario / Workspace vía OAuth2 | ⏳ |
+| M3 | Memoria: contexto de conversación por Session_ID | ✅ |
+| M4 | Integraciones reales: Gmail Trigger + CRM (HubSpot) + Slack + HITL | ✅ |
 | M5 | RAG / base documental (Vector store) | ⏳ |
 | M6 | Voz: STT / TTS | ⏳ |
 | ... | ... hasta el Proyecto Final Integrador | ⏳ |
@@ -30,13 +30,14 @@ Desde M2, el agente tiene nombre y personalidad propia: **Rena**, la asistente v
 ```
 ├── README.md
 ├── checkpoint1_ingrid_ledesma.json        ← M1: Agente base
-└── entregable2/
-    ├── preentrega_modulo2_ledesma_ingrid.pdf   ← Entregable oficial de M2
-    ├── Manager_Renovadas.json
-    ├── Worker_Catalogo_Renovadas.json
-    ├── Worker_Tracking_Renovadas.json
-    ├── Worker_Pedidos_Renovadas.json
-    └── Worker_Escalamiento_Renovadas.json
+├── checkpoint4_ingrid_ledesma.json        ← M4: Integraciones externas
+├── entregable2/
+│   ├── preentrega_modulo2_ledesma_ingrid.pdf   ← Entregable oficial de M2
+│   ├── Manager_Renovadas.json
+│   ├── Worker_Catalogo_Renovadas.json
+│   ├── Worker_Tracking_Renovadas.json
+│   ├── Worker_Pedidos_Renovadas.json
+│   └── Worker_Escalamiento_Renovadas.json
 ```
 A medida que avance el curso, se van a ir sumando carpetas `entregableN/` correspondientes a cada módulo, manteniendo el historial completo de la evolución del proyecto.
 
@@ -135,10 +136,105 @@ El entregable oficial de M2 es `entregable2/preentrega_modulo2_ledesma_ingrid.pd
 - Sin memoria de conversación (se implementa en M3): el Router del Manager sigue clasificando cada mensaje de forma aislada.
 - Modelo Groq elegido por practicidad; requiere que el modelo seleccionado soporte tool-calling nativo (no todos los modelos disponibles en Groq lo soportan).
 
+## 🧠 M3 — Memoria y Contexto de Conversación
+
+### Motivación
+
+En M2 cada mensaje se procesaba de forma aislada: el Manager clasificaba sin saber qué había pasado antes. M3 agrega memoria persistente por sesión, permitiendo que el agente mantenga contexto a lo largo de la conversación.
+
+### Arquitectura de memoria
+
+- **Session ID**: derivado del remitente del email (`$json.From.replace(/[^a-zA-Z0-9]/g, '_')`), identifica de forma única cada conversación.
+- **Lectura Airtable**: al inicio de cada ejecución, busca en Airtable si existe contexto previo para esa sesión usando `filterByFormula`.
+- **IF (¿Existe contexto?)**: si encuentra un registro, lo carga como contexto recuperado; si no, inicializa uno vacío.
+- **Simple Memory** (Buffer Window): ventana de 3 mensajes para mantener contexto conversacional inmediato dentro del AI Agent.
+- **Circuito de persistencia** (después de la respuesta del Worker):
+  - **¿Hay varios mensajes?**: si hay más de 5 mensajes acumulados, pasa por un LLM Chain que comprime el historial en un resumen estructurado (JSON con `asunto_principal`, `puntos_clave`, `accion_requerida`).
+  - **Guardar resumen comprimido** / **Guardar conversación cruda**: upsert en Airtable con el session_id como clave, guardando el resumen, datos clave, estado del proceso y contador de mensajes.
+
+### Campos de contexto
+
+```json
+{
+  "ctx_resumen": "resumen acumulado de la conversación",
+  "ctx_datos": "datos clave del cliente",
+  "ctx_estado": "nuevo | En proceso | Resuelto | Escalado",
+  "ctx_mensajes": 0
+}
+```
+
+## 🔌 M4 — Integraciones Externas (Gmail + HubSpot + Slack + HITL)
+
+### Motivación
+
+M3 seguía usando un Chat Trigger manual. M4 reemplaza el trigger por una integración real con Gmail y agrega tres integraciones externas que conectan el agente con herramientas de negocio reales: CRM (HubSpot), email (Gmail Draft como barrera HITL) y notificaciones (Slack).
+
+### Nodos de rúbrica
+
+El checkpoint 4 requiere 4 nodos específicos que cumplen requisitos de la rúbrica:
+
+1. **IF anti auto-reply (`¿es auto-reply?`)**: filtra correos automáticos (auto-reply, out of office, undeliverable, no-reply@, y el propio email del agente) para evitar bucles infinitos. Usa 5 condiciones AND con `notContains` sobre `$json.Subject` y `$json.From`.
+
+2. **HubSpot Lookup antes de Create (`HubSpot - Buscar contacto` → `¿Contacto existe?` → `HubSpot - Actualizar contacto`)**: busca el contacto en el CRM por email antes de crear/actualizar. Si existe, actualiza; si no, crea uno nuevo. Patrón Search → IF → Upsert.
+
+3. **Gmail Create Draft (`Create a draft`)**: crea un borrador en Gmail con la respuesta del agente en lugar de enviar directamente. Es la barrera **Human-in-the-Loop (HITL)**: un humano debe revisar y aprobar el borrador antes de enviarlo al cliente.
+
+4. **Set payload cleanup (`Set - Validar payload`)**: limpia y valida los datos antes de pasarlos a las integraciones externas. Extrae `contact_email`, `contact_name`, `email_subject`, `agent_response` e `is_valid`, garantizando que HubSpot y Slack reciban datos limpios y evitando errores 400 por campos vacíos u objetos binarios.
+
+### Flujo completo (de punta a punta)
+
+```
+Gmail Trigger (cada minuto, INBOX)
+  → ¿es auto-reply? (IF anti-loop)
+    → [True] Limpiar payload (Set: email_from con regex, email_subject, email_body, session_id)
+      → Lectura Airtable (buscar contexto por session_id)
+        → ¿Existe contexto? → Contexto recuperado / Contexto nuevo
+          → AI Agent (Groq, clasificación de intent)
+            → Contrato (Code: parseo JSON + fallback)
+              → ¿Es riesgo alto?
+                → [True] Worker Escalamiento
+                → [False] Switch (intent) → Worker correspondiente
+                  → Respuesta de workers
+                    → Rama 1: Circuito de memoria (Airtable)
+                    → Rama 2: Set - Validar payload
+                      → HubSpot - Buscar contacto
+                        → ¿Contacto existe?
+                          → HubSpot - Actualizar contacto (upsert)
+                            → Create a draft (Gmail, HITL)
+                              → Slack - Alerta equipo
+    → [False] Rebote de no deseados (NoOp)
+```
+
+### Limpiar payload — Extracción de campos del Gmail Trigger
+
+El Gmail Trigger v1.4 devuelve los campos con **mayúscula inicial** (`From`, `Subject`, `To`, `snippet`). El nodo `Limpiar payload` normaliza estos campos:
+
+| Campo | Expresión | Nota |
+|---|---|---|
+| `email_from` | `={{ $json.From.match(/<(.+)>/)?.[1] \|\| $json.From }}` | Extrae el email limpio de `"Nombre <email>"` |
+| `email_subject` | `={{ $json.Subject }}` | |
+| `email_body` | `={{ $json.snippet }}` | Texto del email |
+| `session_id` | `={{ $json.From.replace(/[^a-zA-Z0-9]/g, '_') }}` | Clave única para memoria |
+
+### Integraciones configuradas
+
+| Servicio | Nodo | Credencial | Función |
+|---|---|---|---|
+| Gmail | Gmail Trigger | OAuth2 | Captura emails entrantes (INBOX, cada minuto) |
+| Gmail | Create a draft | OAuth2 | Crea borrador con la respuesta del agente (HITL) |
+| HubSpot | Buscar / Actualizar contacto | Private App Token | CRM: busca y crea/actualiza contactos |
+| Slack | Alerta equipo | API Token | Notifica al canal `#soporte-renovadas-human-in-the-loop` |
+| Airtable | Lectura / Guardar | API Token | Memoria persistente por sesión |
+
+### Entregable
+
+El archivo `checkpoint4_ingrid_ledesma.json` contiene el workflow completo exportado desde n8n, incluyendo los 4 nodos de rúbrica y todas las integraciones.
+
 ## ⚙️ Cómo importar el flujo
 
 1. En n8n, ir a **Workflows → Import from File**
 2. Seleccionar el `.json` correspondiente al checkpoint o Worker deseado
-3. Configurar las credenciales propias de Notion, Slack y Gmail (OAuth2/API key)
-4. Ajustar los IDs de canal de Slack y de base de datos de Notion según el entorno propio
+3. Configurar las credenciales propias de Notion, Slack, Gmail (OAuth2), HubSpot (Private App Token) y Airtable (API key)
+4. Ajustar los IDs de canal de Slack y de base de datos de Notion/Airtable según el entorno propio
 5. Para M2: importar primero los 4 Workers, luego el Manager, y verificar que cada nodo `Execute Workflow` del Manager apunte al Worker correspondiente ya importado
+6. Para M4: verificar que el Gmail Trigger apunte a la cuenta correcta y que el canal de Slack exista
